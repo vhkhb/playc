@@ -1,0 +1,67 @@
+{
+  "expo": {
+    "name": "PlayC",
+    "slug": "playc",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#4CAF50"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.playc.mobile",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "PlayC needs your location to find nearby venues and games.",
+        "NSLocationAlwaysUsageDescription": "PlayC needs your location to find nearby venues and games.",
+        "NSCameraUsageDescription": "PlayC needs camera access to take photos for your profile and community posts.",
+        "NSPhotoLibraryUsageDescription": "PlayC needs photo library access to upload images for your profile, venues, and community posts."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#4CAF50"
+      },
+      "package": "com.playc.mobile",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow PlayC to use your location to find nearby venues."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow PlayC to access your photos for profile and community posts.",
+          "cameraPermission": "Allow PlayC to use your camera to take photos."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#4CAF50"
+        }
+      ]
+    ]
+  }
+}

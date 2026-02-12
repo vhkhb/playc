@@ -1,0 +1,397 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PLAYER
+  HOST
+  VENDOR
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+}
+
+enum GameStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum ParticipantStatus {
+  INVITED
+  ACCEPTED
+  DECLINED
+  JOINED
+}
+
+enum CommunityMemberRole {
+  ADMIN
+  MODERATOR
+  MEMBER
+}
+
+enum Recurrence {
+  NONE
+  DAILY
+  WEEKLY
+}
+
+enum CommissionType {
+  FIXED
+  PERCENTAGE
+}
+
+// ─────────────────────────────────────────────
+// User & Profiles
+// ─────────────────────────────────────────────
+
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  password    String
+  name        String
+  phone       String?
+  avatar      String?
+  role        UserRole @default(PLAYER)
+  bio         String?
+  location    String?
+  isVerified  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  playerProfile    PlayerProfile?
+  vendorProfile    VendorProfile?
+  bookings         Booking[]
+  hostedGames      Game[]              @relation("GameHost")
+  gameParticipants GameParticipant[]
+  communities      CommunityMember[]
+  communityPosts   CommunityPost[]
+  createdCommunities Community[]       @relation("CommunityCreator")
+  reviews          Review[]
+  notifications    Notification[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model PlayerProfile {
+  id                String  @id @default(uuid())
+  userId            String  @unique
+  sportsPreferences Json    @default("[]")
+  skillLevel        String? @default("BEGINNER")
+  totalGamesPlayed  Int     @default(0)
+  rating            Float   @default(0)
+  reviews           Json    @default("[]")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("player_profiles")
+}
+
+model VendorProfile {
+  id              String  @id @default(uuid())
+  userId          String  @unique
+  businessName    String
+  businessLicense String?
+  address         String
+  city            String
+  state           String
+  zipCode         String?
+  latitude        Float?
+  longitude       Float?
+  isApproved      Boolean @default(false)
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  venues Venue[]
+
+  @@index([city, state])
+  @@map("vendor_profiles")
+}
+
+// ─────────────────────────────────────────────
+// Venue & Slots
+// ─────────────────────────────────────────────
+
+model Venue {
+  id              String  @id @default(uuid())
+  vendorProfileId String
+  name            String
+  description     String?
+  sportType       String
+  address         String
+  city            String
+  state           String
+  latitude        Float?
+  longitude       Float?
+  images          Json    @default("[]")
+  amenities       Json    @default("[]")
+  rating          Float   @default(0)
+  isActive        Boolean @default(true)
+  adBanner        String?
+  isAdActive      Boolean @default(false)
+
+  vendorProfile VendorProfile  @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
+  slots         Slot[]
+  bookings      Booking[]
+  games         Game[]
+  extraServices ExtraService[]
+  reviews       Review[]
+
+  @@index([city, state])
+  @@index([sportType])
+  @@index([isActive])
+  @@index([isAdActive])
+  @@index([latitude, longitude])
+  @@map("venues")
+}
+
+model Slot {
+  id         String     @id @default(uuid())
+  venueId    String
+  date       DateTime
+  startTime  DateTime
+  endTime    DateTime
+  price      Float
+  currency   String     @default("INR")
+  isAvailable Boolean   @default(true)
+  maxPlayers  Int       @default(10)
+  recurrence  Recurrence @default(NONE)
+
+  venue    Venue     @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+  games    Game[]
+
+  @@index([venueId, date])
+  @@index([isAvailable])
+  @@map("slots")
+}
+
+// ─────────────────────────────────────────────
+// Bookings & Payments
+// ─────────────────────────────────────────────
+
+model Booking {
+  id               String        @id @default(uuid())
+  slotId           String
+  userId           String
+  venueId          String
+  status           BookingStatus  @default(PENDING)
+  totalAmount      Float
+  commissionAmount Float          @default(0)
+  commissionType   CommissionType @default(PERCENTAGE)
+  paymentStatus    PaymentStatus  @default(PENDING)
+  paymentId        String?
+  bookedAt         DateTime       @default(now())
+
+  slot  Slot  @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  game  Game?
+
+  @@index([userId])
+  @@index([venueId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@map("bookings")
+}
+
+// ─────────────────────────────────────────────
+// Games & Participants
+// ─────────────────────────────────────────────
+
+model Game {
+  id             String     @id @default(uuid())
+  hostId         String
+  venueId        String
+  slotId         String
+  bookingId      String     @unique
+  title          String
+  sportType      String
+  description    String?
+  maxPlayers     Int        @default(10)
+  currentPlayers Int        @default(0)
+  status         GameStatus @default(UPCOMING)
+  isPublic       Boolean    @default(true)
+  extraServices  Json       @default("[]")
+  createdAt      DateTime   @default(now())
+
+  host         User              @relation("GameHost", fields: [hostId], references: [id], onDelete: Cascade)
+  venue        Venue             @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  slot         Slot              @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  booking      Booking           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  participants GameParticipant[]
+  reviews      Review[]
+
+  @@index([hostId])
+  @@index([venueId])
+  @@index([status])
+  @@index([sportType])
+  @@map("games")
+}
+
+model GameParticipant {
+  id       String            @id @default(uuid())
+  gameId   String
+  userId   String
+  status   ParticipantStatus @default(INVITED)
+  joinedAt DateTime?
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, userId])
+  @@index([gameId])
+  @@index([userId])
+  @@map("game_participants")
+}
+
+// ─────────────────────────────────────────────
+// Communities
+// ─────────────────────────────────────────────
+
+model Community {
+  id            String   @id @default(uuid())
+  name          String
+  description   String?
+  avatar        String?
+  createdById   String
+  sportType     String?
+  isAutoCreated Boolean  @default(false)
+  isPublic      Boolean  @default(true)
+  memberCount   Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  createdBy User              @relation("CommunityCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  members   CommunityMember[]
+  posts     CommunityPost[]
+
+  @@index([sportType])
+  @@index([isPublic])
+  @@map("communities")
+}
+
+model CommunityMember {
+  id          String              @id @default(uuid())
+  communityId String
+  userId      String
+  role        CommunityMemberRole @default(MEMBER)
+  joinedAt    DateTime            @default(now())
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, userId])
+  @@index([communityId])
+  @@index([userId])
+  @@map("community_members")
+}
+
+model CommunityPost {
+  id          String   @id @default(uuid())
+  communityId String
+  authorId    String
+  content     String
+  images      Json     @default("[]")
+  likesCount  Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([communityId])
+  @@index([authorId])
+  @@map("community_posts")
+}
+
+// ─────────────────────────────────────────────
+// Extra Services
+// ─────────────────────────────────────────────
+
+model ExtraService {
+  id          String  @id @default(uuid())
+  venueId     String
+  name        String
+  description String?
+  price       Float
+  isAvailable Boolean @default(true)
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([venueId])
+  @@map("extra_services")
+}
+
+// ─────────────────────────────────────────────
+// Reviews
+// ─────────────────────────────────────────────
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String
+  venueId   String?
+  gameId    String?
+  rating    Float
+  comment   String?
+  createdAt DateTime @default(now())
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  venue Venue? @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  game  Game?  @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@index([venueId])
+  @@index([gameId])
+  @@index([userId])
+  @@map("reviews")
+}
+
+// ─────────────────────────────────────────────
+// Notifications
+// ─────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  body      String
+  type      String
+  data      Json     @default("{}")
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@map("notifications")
+}
+
+// ─────────────────────────────────────────────
+// App Configuration
+// ─────────────────────────────────────────────
+
+model AppConfig {
+  id          String  @id @default(uuid())
+  key         String  @unique
+  value       String
+  description String?
+
+  @@map("app_configs")
+}
